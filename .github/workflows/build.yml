@@ -1,0 +1,42 @@
+name: Build VST3
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --target SpectraEQ_VST3 --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $vst = Get-ChildItem -Path build -Recurse -Directory -Filter "SpectraEQ.vst3" | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $vst.FullName -Destination dist/SpectraEQ.vst3 -Recurse
+          Compress-Archive -Path dist/SpectraEQ.vst3 -DestinationPath SpectraEQ-Windows-VST3.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpectraEQ-Windows-VST3
+          path: SpectraEQ-Windows-VST3.zip
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SpectraEQ-Windows-VST3.zip
